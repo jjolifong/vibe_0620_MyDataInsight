@@ -96,6 +96,11 @@ export default function InsightPanel() {
           <button className="btn-primary" disabled={!sessionId || insightLoading} onClick={() => void handleInsightRequest()}>
             {insightLoading ? "EXAONE 분석 중..." : "EXAONE에게 인사이트 설명 요청"}
           </button>
+          {insightLoading && (
+            <p className="w-full text-sm text-slate-600">
+              EXAONE 분석 중... 로컬 모델이라 최대 3~4분 걸릴 수 있습니다.
+            </p>
+          )}
           <button
             className="btn-secondary"
             disabled={!analysis && !insight}

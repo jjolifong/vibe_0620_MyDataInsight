@@ -17,7 +17,7 @@ async def generate_insight(prompt: str) -> dict[str, str]:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=240.0) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             data = response.json()
