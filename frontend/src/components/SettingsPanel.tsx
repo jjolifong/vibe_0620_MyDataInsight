@@ -1,5 +1,14 @@
+import { useEffect, useState } from "react";
 import { analyzeData } from "../api/client";
 import { useAppStore } from "../store/useAppStore";
+
+interface LmModelItem {
+  id: string;
+}
+
+interface LmModelsResponse {
+  data?: LmModelItem[];
+}
 
 export default function SettingsPanel() {
   const {
@@ -10,7 +19,41 @@ export default function SettingsPanel() {
     setAnalysis,
     setAnalyzing,
     setError,
+    selectedModel,
+    setSelectedModel,
   } = useAppStore();
+
+  const [models, setModels] = useState<LmModelItem[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadModels = async () => {
+      setModelsLoading(true);
+      setModelsError(null);
+      try {
+        const response = await fetch("/api/models");
+        if (!response.ok) {
+          const detail = await response.text();
+          throw new Error(detail || `모델 목록 요청 실패: ${response.status}`);
+        }
+        const payload = (await response.json()) as LmModelsResponse;
+        const items = payload.data ?? [];
+        setModels(items);
+        if (items.length > 0) {
+          const current = useAppStore.getState().selectedModel;
+          const exists = current && items.some((item) => item.id === current);
+          setSelectedModel(exists ? current : items[0].id);
+        }
+      } catch (error) {
+        setModelsError(error instanceof Error ? error.message : "모델 목록을 불러오지 못했습니다.");
+      } finally {
+        setModelsLoading(false);
+      }
+    };
+
+    void loadModels();
+  }, [setSelectedModel]);
 
   const rerunAnalysis = async () => {
     if (!sessionId || selectedColumns.length === 0) return;
@@ -29,6 +72,29 @@ export default function SettingsPanel() {
   return (
     <section className="card space-y-4">
       <h2 className="text-lg font-semibold">설정</h2>
+
+      <label className="block text-sm">
+        <span className="mb-1 block text-slate-600">LM Studio 모델</span>
+        <select
+          className="w-full rounded border border-slate-300 px-3 py-2"
+          value={selectedModel}
+          disabled={modelsLoading || models.length === 0}
+          onChange={(event) => setSelectedModel(event.target.value)}
+        >
+          {models.length === 0 ? (
+            <option value="">
+              {modelsLoading ? "모델 목록 불러오는 중..." : "사용 가능한 모델 없음"}
+            </option>
+          ) : (
+            models.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.id}
+              </option>
+            ))
+          )}
+        </select>
+        {modelsError && <p className="mt-1 text-xs text-rose-600">{modelsError}</p>}
+      </label>
 
       <label className="block text-sm">
         <span className="mb-1 block text-slate-600">미리보기 행 수</span>

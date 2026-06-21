@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+import httpx
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,7 +25,7 @@ from analysis import (
     summarize_categorical,
     summarize_numeric,
 )
-from ollama_client import generate_insight
+from lmstudio_client import LMSTUDIO_BASE_URL, generate_insight
 
 app = FastAPI(title="MyDataInsight API", version="1.0.0")
 
@@ -57,6 +58,7 @@ class PlotRequest(BaseModel):
 
 class InsightsRequest(BaseModel):
     sessionId: str
+    model: str
     sampleRows: int = 5
     maxRows: int = 100
     samplingMethod: str = "random"
@@ -65,6 +67,26 @@ class InsightsRequest(BaseModel):
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/models")
+async def list_models() -> dict[str, Any]:
+    url = f"{LMSTUDIO_BASE_URL}/v1/models"
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.ConnectError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="LM Studio 서버에 연결할 수 없습니다. localhost:1234에서 서버를 실행해주세요.",
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=exc.response.status_code,
+            detail=f"LM Studio models API 오류: {exc.response.text}",
+        ) from exc
 
 
 @app.post("/api/upload")
@@ -187,7 +209,7 @@ async def insights(request: InsightsRequest) -> dict[str, Any]:
         sample_rows=request.sampleRows,
         sample_method=sampling_method,
     )
-    result = await generate_insight(prompt)
+    result = await generate_insight(prompt, request.model)
 
     return {
         "promptPreview": prompt[:500] + ("..." if len(prompt) > 500 else ""),

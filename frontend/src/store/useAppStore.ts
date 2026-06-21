@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import type { AnalysisResult, AppSettings, DatasetMetadata, InsightResponse } from "../types";
 
+export const SELECTED_MODEL_KEY = "mydatainsight.lmstudioModel";
+
+function readStoredModel(): string {
+  if (typeof localStorage === "undefined") return "";
+  return localStorage.getItem(SELECTED_MODEL_KEY) ?? "";
+}
+
 interface AppState {
   sessionId: string | null;
   filename: string | null;
@@ -12,6 +19,7 @@ interface AppState {
   analysis: AnalysisResult | null;
   insight: InsightResponse | null;
   settings: AppSettings;
+  selectedModel: string;
   loading: boolean;
   analyzing: boolean;
   insightLoading: boolean;
@@ -32,6 +40,7 @@ interface AppState {
   setAnalysis: (analysis: AnalysisResult | null) => void;
   setInsight: (insight: InsightResponse | null) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
+  setSelectedModel: (model: string) => void;
   setLoading: (loading: boolean) => void;
   setAnalyzing: (analyzing: boolean) => void;
   setInsightLoading: (insightLoading: boolean) => void;
@@ -62,6 +71,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   analysis: null,
   insight: null,
   settings: defaultSettings,
+  selectedModel: readStoredModel(),
   loading: false,
   analyzing: false,
   insightLoading: false,
@@ -96,6 +106,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAnalysis: (analysis) => set({ analysis, activeStep: "analysis" }),
   setInsight: (insight) => set({ insight }),
   updateSettings: (settings) => set({ settings: { ...get().settings, ...settings } }),
+  setSelectedModel: (model) => {
+    localStorage.setItem(SELECTED_MODEL_KEY, model);
+    set({ selectedModel: model });
+  },
   setLoading: (loading) => set({ loading }),
   setAnalyzing: (analyzing) => set({ analyzing }),
   setInsightLoading: (insightLoading) => set({ insightLoading }),
