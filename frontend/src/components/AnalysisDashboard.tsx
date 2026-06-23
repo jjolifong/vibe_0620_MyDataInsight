@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { fetchPlotData } from "../api/client";
+import {
+  AreaChartView,
+  BarChartView,
+  BubbleChartView,
+  categoricalToBarData,
+  categoricalToPieData,
+  ChartBox,
+  histogramToAreaData,
+  histogramToBarData,
+  histogramToLineData,
+  LineChartView,
+  PieChartView,
+  ScaleLineChartView,
+  scatterToBubbleData,
+  scatterToScatterData,
+  ScatterChartView,
+} from "../charts";
 import { useAppStore } from "../store/useAppStore";
 import type { BarData, HistogramData, ScatterData } from "../types";
 
@@ -112,6 +117,61 @@ export default function AnalysisDashboard() {
     { id: "charts", label: "시각화" },
     { id: "correlation", label: "상관분석" },
   ];
+
+  const histSelect = (
+    <select
+      className="rounded border border-slate-300 px-2 py-1 text-sm"
+      value={histColumn}
+      onChange={(event) => setHistColumn(event.target.value)}
+    >
+      {numericColumns.map((column) => (
+        <option key={column} value={column}>
+          {column}
+        </option>
+      ))}
+    </select>
+  );
+
+  const barSelect = (
+    <select
+      className="rounded border border-slate-300 px-2 py-1 text-sm"
+      value={barColumn}
+      onChange={(event) => setBarColumn(event.target.value)}
+    >
+      {categoricalColumns.map((column) => (
+        <option key={column} value={column}>
+          {column}
+        </option>
+      ))}
+    </select>
+  );
+
+  const scatterSelects = (
+    <>
+      <select
+        className="rounded border border-slate-300 px-2 py-1 text-sm"
+        value={scatterX}
+        onChange={(event) => setScatterX(event.target.value)}
+      >
+        {numericColumns.map((column) => (
+          <option key={column} value={column}>
+            X: {column}
+          </option>
+        ))}
+      </select>
+      <select
+        className="rounded border border-slate-300 px-2 py-1 text-sm"
+        value={scatterY}
+        onChange={(event) => setScatterY(event.target.value)}
+      >
+        {numericColumns.map((column) => (
+          <option key={column} value={column}>
+            Y: {column}
+          </option>
+        ))}
+      </select>
+    </>
+  );
 
   return (
     <section className="card space-y-5">
@@ -214,113 +274,48 @@ export default function AnalysisDashboard() {
       )}
 
       {tab === "charts" && (
-        <div className="space-y-8">
+        <div className="space-y-6">
+          <p className="text-xs text-slate-500">Chart.js 기반 시각화 (Bar · Line · Area · Pie · Scatter · Bubble · Scale)</p>
           {chartLoading && <p className="text-sm text-slate-500">차트 데이터를 불러오는 중...</p>}
 
-          <div>
-            <div className="mb-3 flex items-center gap-3">
-              <h3 className="font-medium">히스토그램</h3>
-              <select
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-                value={histColumn}
-                onChange={(event) => setHistColumn(event.target.value)}
-              >
-                {numericColumns.map((column) => (
-                  <option key={column} value={column}>
-                    {column}
-                  </option>
-                ))}
-              </select>
+          {histogramData && (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <ChartBox title="Bar Chart — 히스토그램" controls={histSelect}>
+                <BarChartView data={histogramToBarData(histogramData)} />
+              </ChartBox>
+              <ChartBox title="Line Chart — 분포">
+                <LineChartView data={histogramToLineData(histogramData)} />
+              </ChartBox>
+              <ChartBox title="Area Chart — 분포">
+                <AreaChartView data={histogramToAreaData(histogramData)} />
+              </ChartBox>
+              <ChartBox title="Scale Chart — 로그 Y축">
+                <ScaleLineChartView data={histogramToLineData(histogramData)} title="Log scale" />
+              </ChartBox>
             </div>
-            {histogramData && (
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={histogramData.bins}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="label" hide />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#2563eb" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+          )}
 
-          <div>
-            <div className="mb-3 flex items-center gap-3">
-              <h3 className="font-medium">바 차트</h3>
-              <select
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-                value={barColumn}
-                onChange={(event) => setBarColumn(event.target.value)}
-              >
-                {categoricalColumns.map((column) => (
-                  <option key={column} value={column}>
-                    {column}
-                  </option>
-                ))}
-              </select>
+          {barData && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <ChartBox title="Bar Chart — 범주 빈도" controls={barSelect}>
+                <BarChartView data={categoricalToBarData(barData)} />
+              </ChartBox>
+              <ChartBox title="Pie Chart — 범주 비율">
+                <PieChartView data={categoricalToPieData(barData)} />
+              </ChartBox>
             </div>
-            {barData && (
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData.items}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="label" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count">
-                      {barData.items.map((_, index) => (
-                        <Cell key={index} fill={["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b"][index % 4]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+          )}
 
-          <div>
-            <div className="mb-3 flex flex-wrap items-center gap-3">
-              <h3 className="font-medium">산점도</h3>
-              <select
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-                value={scatterX}
-                onChange={(event) => setScatterX(event.target.value)}
-              >
-                {numericColumns.map((column) => (
-                  <option key={column} value={column}>
-                    X: {column}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-                value={scatterY}
-                onChange={(event) => setScatterY(event.target.value)}
-              >
-                {numericColumns.map((column) => (
-                  <option key={column} value={column}>
-                    Y: {column}
-                  </option>
-                ))}
-              </select>
+          {scatterData && scatterX !== scatterY && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <ChartBox title="Scatter Chart" controls={scatterSelects}>
+                <ScatterChartView data={scatterToScatterData(scatterData)} />
+              </ChartBox>
+              <ChartBox title="Bubble Chart">
+                <BubbleChartView data={scatterToBubbleData(scatterData)} />
+              </ChartBox>
             </div>
-            {scatterData && (
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" dataKey="x" name={scatterData.xColumn} />
-                    <YAxis type="number" dataKey="y" name={scatterData.yColumn} />
-                    <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-                    <Scatter data={scatterData.points} fill="#7c3aed" />
-                  </ScatterChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       )}
 
