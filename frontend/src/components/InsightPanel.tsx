@@ -46,6 +46,41 @@ function downloadText(filename: string, content: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
+function renderInsightSummary(text: string) {
+  return text.split("\n").map((line, index) => {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("#### ")) {
+      return (
+        <h5 key={index} className="mt-3 font-semibold text-[1.2em] leading-snug text-slate-800">
+          {trimmed.slice(5)}
+        </h5>
+      );
+    }
+
+    if (trimmed.startsWith("### ")) {
+      return (
+        <h4 key={index} className="mt-3 font-semibold text-[1.2em] leading-snug text-slate-800">
+          {trimmed.slice(4)}
+        </h4>
+      );
+    }
+
+    if (trimmed === "") {
+      return <div key={index} className="h-2" />;
+    }
+
+    const bodyText = trimmed.replace(/^[-*•]\s*/, "");
+
+    return (
+      <p key={index} className="flex gap-2 leading-relaxed text-slate-800">
+        <span className="shrink-0 text-slate-600">•</span>
+        <span>{bodyText}</span>
+      </p>
+    );
+  });
+}
+
 export default function InsightPanel() {
   const {
     sessionId,
@@ -130,7 +165,7 @@ export default function InsightPanel() {
         <div className="space-y-4">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs text-slate-500">모델: {insight.model} · 상태: {insight.status}</p>
-            <div className="prose prose-sm mt-3 max-w-none whitespace-pre-wrap text-slate-800">{insight.insight}</div>
+            <div className="mt-3 space-y-1 text-sm text-slate-800">{renderInsightSummary(insight.insight)}</div>
           </div>
         </div>
       ) : (

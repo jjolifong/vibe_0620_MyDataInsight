@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useAppStore } from "../store/useAppStore";
 
+const TABLE_DISPLAY_ROWS = 20;
+
 const typeBadge: Record<string, string> = {
   number: "bg-blue-100 text-blue-700",
   string: "bg-emerald-100 text-emerald-700",
@@ -9,13 +11,12 @@ const typeBadge: Record<string, string> = {
 };
 
 export default function DataPreview() {
-  const { metadata, preview, clientRows, qualityIssues, selectedColumns, toggleColumn, settings } =
-    useAppStore();
+  const { metadata, preview, clientRows, qualityIssues, selectedColumns, toggleColumn } = useAppStore();
 
   const displayRows = useMemo(() => {
     const source = preview.length > 0 ? preview : clientRows;
-    return source.slice(0, settings.previewRows);
-  }, [preview, clientRows, settings.previewRows]);
+    return source.slice(0, TABLE_DISPLAY_ROWS);
+  }, [preview, clientRows]);
 
   if (!metadata && clientRows.length === 0) {
     return (

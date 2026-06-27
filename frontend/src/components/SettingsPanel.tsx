@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { analyzeData } from "../api/client";
 import { useAppStore } from "../store/useAppStore";
+
+const SELECTED_RUNTIME_KEY = "mydatainsight.llmRuntime";
+
+type LlmRuntime = "lmstudio" | "ollama";
 
 interface LmModelItem {
   id: string;
@@ -26,13 +30,51 @@ export default function SettingsPanel() {
   const [models, setModels] = useState<LmModelItem[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
+  const [selectedRuntime, setSelectedRuntime] = useState<LlmRuntime>(() => {
+    const saved = localStorage.getItem(SELECTED_RUNTIME_KEY);
+    return saved === "ollama" ? "ollama" : "lmstudio";
+  });
+  const selectedRuntimeRef = useRef(selectedRuntime);
+
+  useEffect(() => {
+    selectedRuntimeRef.current = selectedRuntime;
+    localStorage.setItem(SELECTED_RUNTIME_KEY, selectedRuntime);
+  }, [selectedRuntime]);
+
+  useEffect(() => {
+    const downstreamFetch = window.fetch.bind(window);
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+
+      if (url.includes("/api/insights") && method.toUpperCase() === "POST" && init?.body) {
+        const runtime = selectedRuntimeRef.current;
+        if (typeof init.body === "string") {
+          try {
+            const body = JSON.parse(init.body) as Record<string, unknown>;
+            body.runtime = runtime;
+            init = { ...init, body: JSON.stringify(body) };
+          } catch {
+            // JSON 파싱 실패 시 원래 요청 그대로 전달
+          }
+        }
+      }
+
+      return downstreamFetch(input, init);
+    };
+
+    return () => {
+      window.fetch = downstreamFetch;
+    };
+  }, []);
 
   useEffect(() => {
     const loadModels = async () => {
       setModelsLoading(true);
       setModelsError(null);
+      setModels([]);
       try {
-        const response = await fetch("/api/models");
+        const response = await fetch(`/api/models?runtime=${selectedRuntime}`);
         if (!response.ok) {
           const detail = await response.text();
           throw new Error(detail || `모델 목록 요청 실패: ${response.status}`);
@@ -44,16 +86,19 @@ export default function SettingsPanel() {
           const current = useAppStore.getState().selectedModel;
           const exists = current && items.some((item) => item.id === current);
           setSelectedModel(exists ? current : items[0].id);
+        } else {
+          setSelectedModel("");
         }
       } catch (error) {
         setModelsError(error instanceof Error ? error.message : "모델 목록을 불러오지 못했습니다.");
+        setSelectedModel("");
       } finally {
         setModelsLoading(false);
       }
     };
 
     void loadModels();
-  }, [setSelectedModel]);
+  }, [selectedRuntime, setSelectedModel]);
 
   const rerunAnalysis = async () => {
     if (!sessionId || selectedColumns.length === 0) return;
@@ -74,7 +119,21 @@ export default function SettingsPanel() {
       <h2 className="text-lg font-semibold">설정</h2>
 
       <label className="block text-sm">
-        <span className="mb-1 block text-slate-600">LM Studio 모델</span>
+        <span className="mb-1 block text-slate-600">LLM 런타임</span>
+        <select
+          className="w-full rounded border border-slate-300 px-3 py-2"
+          value={selectedRuntime}
+          onChange={(event) => setSelectedRuntime(event.target.value as LlmRuntime)}
+        >
+          <option value="lmstudio">LM Studio</option>
+          <option value="ollama">Ollama</option>
+        </select>
+      </label>
+
+      <label className="block text-sm">
+        <span className="mb-1 block text-slate-600">
+          {selectedRuntime === "ollama" ? "Ollama 모델" : "LM Studio 모델"}
+        </span>
         <select
           className="w-full rounded border border-slate-300 px-3 py-2"
           value={selectedModel}

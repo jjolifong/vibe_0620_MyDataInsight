@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchPlotData } from "../api/client";
+import { fetchPlotData, recommendCharts, suggestQuestions } from "../api/client";
 import {
   AreaChartView,
   BarChartView,
@@ -18,17 +18,67 @@ import {
   ScatterChartView,
 } from "../charts";
 import { useAppStore } from "../store/useAppStore";
-import type { BarData, HistogramData, ScatterData } from "../types";
+import type { BarData, HistogramData, RecommendedChart, ScatterData } from "../types";
 
-type DashboardTab = "stats" | "charts" | "correlation";
+type DashboardTab = "stats" | "charts" | "correlation" | "aiCharts" | "dataQuestion";
+
+const RUNTIME_STORAGE_KEY = "mydatainsight.llmRuntime";
+
+function readRuntime(): "lmstudio" | "ollama" {
+  const saved = localStorage.getItem(RUNTIME_STORAGE_KEY);
+  return saved === "ollama" ? "ollama" : "lmstudio";
+}
+
+function RecommendedChartCard({ chart }: { chart: RecommendedChart }) {
+  const chartBody = (() => {
+    if (chart.dataSource === "histogram") {
+      const data = chart.plotData as HistogramData;
+      if (chart.chartType === "line") {
+        return <LineChartView data={histogramToLineData(data)} title={chart.title} />;
+      }
+      if (chart.chartType === "area") {
+        return <AreaChartView data={histogramToAreaData(data)} title={chart.title} />;
+      }
+      return <BarChartView data={histogramToBarData(data)} title={chart.title} />;
+    }
+
+    if (chart.dataSource === "bar") {
+      const data = chart.plotData as BarData;
+      if (chart.chartType === "pie") {
+        return <PieChartView data={categoricalToPieData(data)} title={chart.title} />;
+      }
+      return <BarChartView data={categoricalToBarData(data)} title={chart.title} />;
+    }
+
+    const data = chart.plotData as ScatterData;
+    if (chart.chartType === "bubble") {
+      return <BubbleChartView data={scatterToBubbleData(data)} title={chart.title} />;
+    }
+    return <ScatterChartView data={scatterToScatterData(data)} title={chart.title} />;
+  })();
+
+  return (
+    <div>
+      <p className="mb-2 text-sm text-slate-600">{chart.description}</p>
+      <ChartBox title={chart.title}>{chartBody}</ChartBox>
+    </div>
+  );
+}
 
 export default function AnalysisDashboard() {
-  const { analysis, metadata, selectedColumns, sessionId, settings, analyzing } = useAppStore();
+  const { analysis, metadata, selectedColumns, sessionId, settings, analyzing, selectedModel } = useAppStore();
   const [tab, setTab] = useState<DashboardTab>("stats");
   const [histogramData, setHistogramData] = useState<HistogramData | null>(null);
   const [barData, setBarData] = useState<BarData | null>(null);
   const [scatterData, setScatterData] = useState<ScatterData | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
+  const [aiCharts, setAiCharts] = useState<RecommendedChart[] | null>(null);
+  const [aiChartsLoading, setAiChartsLoading] = useState(false);
+  const [aiChartsError, setAiChartsError] = useState<string | null>(null);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[] | null>(null);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [questionsError, setQuestionsError] = useState<string | null>(null);
+  const [questionInput, setQuestionInput] = useState("");
 
   const numericColumns = useMemo(
     () =>
@@ -60,6 +110,14 @@ export default function AnalysisDashboard() {
       setBarColumn(categoricalColumns[0]);
     }
   }, [numericColumns, categoricalColumns]);
+
+  useEffect(() => {
+    setAiCharts(null);
+    setSuggestedQuestions(null);
+    setQuestionInput("");
+    setAiChartsError(null);
+    setQuestionsError(null);
+  }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId || tab !== "charts") return;
@@ -102,6 +160,56 @@ export default function AnalysisDashboard() {
     void loadCharts();
   }, [sessionId, tab, histColumn, barColumn, scatterX, scatterY, settings.chartBins, settings.chartTopN]);
 
+  useEffect(() => {
+    if (!sessionId || tab !== "aiCharts" || aiCharts !== null) return;
+
+    const loadAiCharts = async () => {
+      setAiChartsLoading(true);
+      setAiChartsError(null);
+      try {
+        const result = await recommendCharts({
+          sessionId,
+          model: selectedModel,
+          runtime: readRuntime(),
+          columns: selectedColumns,
+          bins: settings.chartBins,
+          topN: settings.chartTopN,
+        });
+        setAiCharts(result.charts);
+      } catch (error) {
+        setAiChartsError(error instanceof Error ? error.message : "AI 차트 추천에 실패했습니다.");
+      } finally {
+        setAiChartsLoading(false);
+      }
+    };
+
+    void loadAiCharts();
+  }, [sessionId, tab, aiCharts, selectedColumns, selectedModel, settings.chartBins, settings.chartTopN]);
+
+  useEffect(() => {
+    if (!sessionId || tab !== "dataQuestion" || suggestedQuestions !== null) return;
+
+    const loadQuestions = async () => {
+      setQuestionsLoading(true);
+      setQuestionsError(null);
+      try {
+        const result = await suggestQuestions({
+          sessionId,
+          model: selectedModel,
+          runtime: readRuntime(),
+          columns: selectedColumns,
+        });
+        setSuggestedQuestions(result.questions);
+      } catch (error) {
+        setQuestionsError(error instanceof Error ? error.message : "추천 질문 생성에 실패했습니다.");
+      } finally {
+        setQuestionsLoading(false);
+      }
+    };
+
+    void loadQuestions();
+  }, [sessionId, tab, suggestedQuestions, selectedColumns, selectedModel]);
+
   if (!analysis) {
     return (
       <section className="card">
@@ -116,6 +224,8 @@ export default function AnalysisDashboard() {
     { id: "stats", label: "기본통계" },
     { id: "charts", label: "시각화" },
     { id: "correlation", label: "상관분석" },
+    { id: "aiCharts", label: "차트 생성" },
+    { id: "dataQuestion", label: "데이터 질문하기" },
   ];
 
   const histSelect = (
@@ -314,6 +424,65 @@ export default function AnalysisDashboard() {
               <ChartBox title="Bubble Chart">
                 <BubbleChartView data={scatterToBubbleData(scatterData)} />
               </ChartBox>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "aiCharts" && (
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            AI가 데이터 특성을 분석해 Chart.js 차트 3~6개를 추천·생성합니다.
+          </p>
+          {aiChartsLoading && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              AI가 차트를 추천하고 생성하는 중입니다...
+            </div>
+          )}
+          {aiChartsError && <p className="text-sm text-rose-600">{aiChartsError}</p>}
+          {!aiChartsLoading && aiCharts && aiCharts.length === 0 && (
+            <p className="text-sm text-slate-500">생성할 수 있는 차트가 없습니다.</p>
+          )}
+          {aiCharts && aiCharts.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-2">
+              {aiCharts.map((chart, index) => (
+                <RecommendedChartCard key={`${chart.title}-${index}`} chart={chart} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "dataQuestion" && (
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">AI가 데이터에 맞는 분석 질문 6개를 미리 생성합니다.</p>
+          {questionsLoading && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              AI가 추천 질문을 생성하는 중입니다...
+            </div>
+          )}
+          {questionsError && <p className="text-sm text-rose-600">{questionsError}</p>}
+          <label className="block text-sm">
+            <span className="mb-1 block text-slate-600">질문 입력</span>
+            <textarea
+              className="min-h-28 w-full rounded border border-slate-300 px-3 py-2"
+              value={questionInput}
+              onChange={(event) => setQuestionInput(event.target.value)}
+              placeholder="데이터에 대해 궁금한 점을 입력하세요."
+            />
+          </label>
+          {suggestedQuestions && suggestedQuestions.length > 0 && (
+            <div className="grid gap-2 md:grid-cols-2">
+              {suggestedQuestions.map((question) => (
+                <button
+                  key={question}
+                  type="button"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                  onClick={() => setQuestionInput(question)}
+                >
+                  {question}
+                </button>
+              ))}
             </div>
           )}
         </div>

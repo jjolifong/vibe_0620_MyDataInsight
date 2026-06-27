@@ -88,3 +88,27 @@ export interface ScatterData {
   yColumn: string;
   points: { x: number; y: number }[];
 }
+
+export type RecommendedChartType = "bar" | "line" | "area" | "pie" | "scatter" | "bubble";
+export type RecommendedDataSource = "histogram" | "bar" | "scatter";
+
+export interface RecommendedChart {
+  chartType: RecommendedChartType;
+  title: string;
+  description: string;
+  dataSource: RecommendedDataSource;
+  column?: string;
+  xColumn?: string;
+  yColumn?: string;
+  plotData: HistogramData | BarData | ScatterData;
+}
+
+export interface RecommendChartsResponse {
+  charts: RecommendedChart[];
+  status: string;
+}
+
+export interface SuggestQuestionsResponse {
+  questions: string[];
+  status: string;
+}

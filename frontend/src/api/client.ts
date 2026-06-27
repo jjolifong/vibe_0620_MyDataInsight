@@ -1,4 +1,13 @@
-import type { AnalysisResult, BarData, HistogramData, InsightResponse, ScatterData, UploadResponse } from "../types";
+import type {
+  AnalysisResult,
+  BarData,
+  HistogramData,
+  InsightResponse,
+  RecommendChartsResponse,
+  ScatterData,
+  SuggestQuestionsResponse,
+  UploadResponse,
+} from "../types";
 
 const API_BASE = "/api";
 
@@ -65,6 +74,34 @@ export async function requestInsights(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sessionId, sampleRows, maxRows, samplingMethod }),
+  });
+}
+
+export async function recommendCharts(payload: {
+  sessionId: string;
+  model: string;
+  runtime: string;
+  columns: string[];
+  bins?: number;
+  topN?: number;
+}): Promise<RecommendChartsResponse> {
+  return request<RecommendChartsResponse>("/recommend-charts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function suggestQuestions(payload: {
+  sessionId: string;
+  model: string;
+  runtime: string;
+  columns: string[];
+}): Promise<SuggestQuestionsResponse> {
+  return request<SuggestQuestionsResponse>("/suggest-questions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
 }
 

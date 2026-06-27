@@ -1,5 +1,6 @@
 import type { ChartData, ChartOptions } from "chart.js";
 import { Bar, Bubble, Line, Pie, Scatter } from "react-chartjs-2";
+import { InteractiveChart } from "./ChartExpandModal";
 import "./setup";
 import {
   barChartOptions,
@@ -17,30 +18,81 @@ interface ChartViewProps<T extends "bar" | "line" | "pie" | "scatter" | "bubble"
 }
 
 export function BarChartView({ data, options, title }: ChartViewProps<"bar">) {
-  return <Bar data={data} options={options ?? barChartOptions(title)} />;
+  const baseOptions = options ?? barChartOptions(title);
+  return (
+    <InteractiveChart
+      modalTitle={title ?? "Bar Chart"}
+      baseOptions={baseOptions}
+      renderChart={(chartOptions, chartRef) => <Bar ref={chartRef} data={data} options={chartOptions} />}
+    />
+  );
 }
 
 export function LineChartView({ data, options, title }: ChartViewProps<"line">) {
-  return <Line data={data} options={options ?? lineChartOptions(title)} />;
+  const baseOptions = options ?? lineChartOptions(title);
+  return (
+    <InteractiveChart
+      modalTitle={title ?? "Line Chart"}
+      baseOptions={baseOptions}
+      renderChart={(chartOptions, chartRef) => <Line ref={chartRef} data={data} options={chartOptions} />}
+    />
+  );
 }
 
 export function AreaChartView({ data, options, title }: ChartViewProps<"line">) {
-  return <Line data={data} options={options ?? lineChartOptions(title)} />;
+  const baseOptions = options ?? lineChartOptions(title);
+  return (
+    <InteractiveChart
+      modalTitle={title ?? "Area Chart"}
+      baseOptions={baseOptions}
+      renderChart={(chartOptions, chartRef) => <Line ref={chartRef} data={data} options={chartOptions} />}
+    />
+  );
 }
 
 export function PieChartView({ data, options, title }: ChartViewProps<"pie">) {
-  return <Pie data={data} options={options ?? pieChartOptions(title)} />;
+  const baseOptions = options ?? pieChartOptions(title);
+  return (
+    <InteractiveChart
+      modalTitle={title ?? "Pie Chart"}
+      baseOptions={baseOptions}
+      hasScales={false}
+      renderChart={(chartOptions, chartRef) => <Pie ref={chartRef} data={data} options={chartOptions} />}
+    />
+  );
 }
 
 export function ScatterChartView({ data, options, title }: ChartViewProps<"scatter">) {
-  return <Scatter data={data} options={options ?? scatterChartOptions(title)} />;
+  const baseOptions = options ?? scatterChartOptions(title);
+  return (
+    <InteractiveChart
+      modalTitle={title ?? "Scatter Chart"}
+      baseOptions={baseOptions}
+      renderChart={(chartOptions, chartRef) => <Scatter ref={chartRef} data={data} options={chartOptions} />}
+    />
+  );
 }
 
 export function BubbleChartView({ data, options, title }: ChartViewProps<"bubble">) {
-  return <Bubble data={data} options={options ?? bubbleChartOptions(title)} />;
+  const baseOptions = options ?? bubbleChartOptions(title);
+  return (
+    <InteractiveChart
+      modalTitle={title ?? "Bubble Chart"}
+      baseOptions={baseOptions}
+      renderChart={(chartOptions, chartRef) => <Bubble ref={chartRef} data={data} options={chartOptions} />}
+    />
+  );
 }
 
 /** Scale Chart: Y축 로그 스케일 Line */
 export function ScaleLineChartView({ data, title }: ChartViewProps<"line">) {
-  return <Line data={data} options={logarithmicScaleOptions(title)} />;
+  const baseOptions = logarithmicScaleOptions(title);
+  return (
+    <InteractiveChart
+      modalTitle={title ?? "Scale Chart"}
+      baseOptions={baseOptions}
+      defaultLogY
+      renderChart={(chartOptions, chartRef) => <Line ref={chartRef} data={data} options={chartOptions} />}
+    />
+  );
 }
